@@ -1,4 +1,4 @@
-const V='bdbd-v2',TILES='bdbd-tiles';
+const V='bdbd-v4',TILES='bdbd-tiles';
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
 self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const u=new URL(r.url);
