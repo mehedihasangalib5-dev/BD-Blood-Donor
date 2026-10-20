@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 360">
+<defs>
+<linearGradient id="h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5263"/><stop offset="1" stop-color="#b30f22"/></linearGradient>
+<linearGradient id="d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6070"/><stop offset="1" stop-color="#c8102e"/></linearGradient>
+<linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7c3a4"/><stop offset="1" stop-color="#eaa683"/></linearGradient>
+</defs>
+<g fill="#f6a8b2"><circle cx="62" cy="92" r="5"/><circle cx="352" cy="64" r="4"/><circle cx="372" cy="226" r="5"/><circle cx="34" cy="200" r="4"/></g>
+<path d="M322 104l4 10 10 4-10 4-4 10-4-10-10-4 10-4z" fill="#fff"/><path d="M78 140l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#fff"/>
+<ellipse cx="200" cy="344" rx="120" ry="10" fill="#f3c6cc" opacity=".6"/>
+<path d="M200 268C64 192 76 62 148 60c30 0 48 18 52 42 4-24 22-42 52-42 72 2 84 132-52 208z" fill="url(#h)"/>
+<path d="M112 98c10-20 38-28 58-12" stroke="#ff9dab" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M232 84c16-10 36-4 44 12" stroke="#d8222f" stroke-width="8" fill="none" stroke-linecap="round" opacity=".5"/>
+<polyline points="104,168 158,168 180,120 214,214 240,146 254,168 298,168" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M338 124c-15 24-27 38-27 54a27 27 0 0054 0c0-16-12-30-27-54z" fill="url(#d)"/><path d="M329 176c0 8 4 14 10 17" stroke="#ff9aa6" stroke-width="5" fill="none" stroke-linecap="round"/>
+<path d="M366 244c-9 14-15 23-15 32a15 15 0 0030 0c0-9-6-18-15-32z" fill="url(#d)" opacity=".92"/>
+<g id="hand"><path d="M20 346c4-44 30-78 70-92 34-12 66-6 92 12 24 16 48 14 58 24 6 8 0 20-12 20l-60-4c-18-2-34 6-44 20l-16 22z" fill="url(#sk)"/>
+<path d="M118 270c20-4 40 4 54 14M104 286c24-4 44 6 58 18" stroke="#d98f6c" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".7"/>
+<path d="M-6 322l52-30 34 56-54 28z" fill="#fff" stroke="#e8ecf4" stroke-width="3"/></g>
+<use href="#hand" transform="translate(400 0) scale(-1 1)"/>
+</svg>
