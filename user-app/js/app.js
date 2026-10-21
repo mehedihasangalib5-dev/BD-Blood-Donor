@@ -37,11 +37,10 @@ const byTime=(a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0);
 const ERR={'auth/invalid-credential':'Wrong email or password','auth/email-already-in-use':'This email is already registered','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Invalid email address','auth/popup-closed-by-user':'Sign-in cancelled','auth/cancelled-popup-request':'Sign-in cancelled','auth/popup-blocked':'Your browser blocked the Google popup. Allow popups and try again','auth/unauthorized-domain':'This domain is not authorized in Firebase','auth/operation-not-allowed':'This sign-in method is not enabled in Firebase','permission-denied':'Permission denied (check Firestore rules)'};
 const fail=e=>toast(ERR[e.code]||'Something went wrong, please try again');
 const halt=()=>new Promise(()=>{});
-const user=await new Promise(r=>{const off=A.onAuthStateChanged(auth,u=>{off();r(u)})});
-if(!user&&!['splash','onboarding','login','signup'].includes(page)){location.replace('login.html');await halt()}
-if(user&&['login','signup'].includes(page)){location.replace('home.html');await halt()}
-let me={};
-if(user){try{const s=await F.getDoc(F.doc(db,'users',user.uid));me=s.exists()?s.data():{}}catch(e){}me.name=me.name||user.displayName||(user.email||'Donor').split('@')[0]}
+const APPPAGE=!['splash','onboarding','login','signup'].includes(page);
+const CK='bd_me',readCache=()=>{try{return JSON.parse(sessionStorage.getItem(CK))}catch(e){return null}},clearCache=()=>{try{sessionStorage.removeItem(CK)}catch(e){}};
+let user=null,me={};
+const authReady=new Promise(r=>{const off=A.onAuthStateChanged(auth,u=>{off();r(u)})});
 const inp=(l,id,t='text',v='',x='')=>`<label>${l}<input class="in" id="${id}" type="${t}" value="${esc(v)}" ${x}></label>`;
 const sel=(l,id,o,v='',ph='')=>`<label>${l}<select class="in" id="${id}">${ph?`<option value="">${ph}</option>`:''}${o.map(x=>`<option ${x==v?'selected':''}>${x}</option>`).join('')}</select></label>`;
 const val=id=>$('#'+id).value.trim();
@@ -53,8 +52,9 @@ const T=Object.fromEntries([...NAV.map(n=>[n[0],n[1]]),['donor','Donor Profile']
 const CUR={'edit-profile':'profile',settings:'profile',help:'profile',features:'profile',donor:'find-donor'}[page]||page;
 function shell(){const items=[...NAV,...(me.role=='admin'?[['admin','Admin','shield']]:[])];
  document.body.innerHTML=`<div class="shell"><aside class="side"><a class="brand" href="home.html"><img src="assets/logo.png" alt="BD-Blood Donor"></a><nav>${items.map(([h,l,i])=>`<a href="${h=='admin'?ADMIN_URL:h+'.html'}" class="${h==CUR?'on':''}" title="${l}">${ic(i)}<span>${l}</span></a>`).join('')}</nav><button class="lo" id="out">${ic('out')}<span>Log out</span></button></aside><main><header class="bar"><h1>${T[page]||''}</h1><a class="bell" href="notifications.html" aria-label="Notifications">${ic('bell')}<b id="nb" hidden></b></a><a class="me" href="profile.html" aria-label="Profile">${me.photo&&me.photo.startsWith('data:image/')?`<img src="${esc(me.photo)}" alt="">`:esc(ini(me.name))}</a></header><section id="view"></section></main><nav class="tabs">${TABS.map(h=>{const n=NAV.find(x=>x[0]==h);return `<a href="${h}.html" class="${h==CUR?'on':''}">${ic(n[2])}<span>${n[1]}</span></a>`}).join('')}</nav></div>`;
- $('#out').onclick=async()=>{await A.signOut(auth);location.href='login.html'};
- let init=true;F.onSnapshot(F.query(col('notifications'),F.where('uid','==',user.uid),F.where('read','==',false)),s=>{const b=$('#nb');if(b){b.hidden=!s.size;b.textContent=s.size}if(!init)s.docChanges().forEach(c=>{if(c.type=='added'){const d=c.doc.data();toast(d.title+': '+d.body);try{if(Notification.permission=='granted')new Notification(d.title,{body:d.body,icon:'assets/logo.png'})}catch(e){}}});init=false},()=>{})}
+ $('#out').onclick=async()=>{clearCache();await A.signOut(auth);location.href='login.html'};
+}
+let _bd=false;function badge(){if(_bd||!user)return;_bd=true;let init=true;F.onSnapshot(F.query(col('notifications'),F.where('uid','==',user.uid),F.where('read','==',false)),s=>{const b=$('#nb');if(b){b.hidden=!s.size;b.textContent=s.size}if(!init)s.docChanges().forEach(c=>{if(c.type=='added'){const d=c.doc.data();toast(d.title+': '+d.body);try{if(Notification.permission=='granted')new Notification(d.title,{body:d.body,icon:'assets/logo.png'})}catch(e){}}});init=false},()=>{})}
 const R={};
 /* ---------- public pages ---------- */
 R.splash=()=>{document.body.innerHTML=`<div class="splash" id="s"><div class="sp-logo"><i class="ring"></i><i class="ring r2"></i><img src="assets/logo-white.png" alt="BD-Blood Donor"></div><p class="sp-t" style="font-size:17px">Save Lives</p><p class="sp-t" style="margin-top:30px;animation-delay:1.2s">Small act. A big impact.</p></div>`;
@@ -108,9 +108,11 @@ R.notifications=async v=>{const ns=(await list(mine('notifications'))).sort(byTi
  v.innerHTML=`<div class="grid2">${ns.map(n=>`<div class="card row" style="align-items:flex-start"><div class="av">${ic('bell',20)}</div><div class="grow"><div class="row sp"><b>${esc(n.title)}</b><span class="mut">${fmt(n.createdAt)}</span></div><p class="mut">${esc(n.body)}</p></div></div>`).join('')||empty(ic('bell',48),'No notifications','You’re all caught up.')}</div>`;
  ns.filter(n=>!n.read).forEach(n=>F.updateDoc(F.doc(db,'notifications',n.id),{read:true}).catch(()=>{}));$('#nb').hidden=true};
 R.profile=async v=>{
- const items=[['edit','Edit Profile','edit-profile.html'],['drop','My Donations','history.html'],['list','My Requests','my-requests.html'],['gear','Settings','settings.html'],['help','Help & Support','help.html'],...(me.role=='admin'?[['shield','Admin Panel',ADMIN_URL]]:[])];
- v.innerHTML=`<section class="phead"><a class="pback" href="home.html" aria-label="Back">${ic('back',24)}</a><div class="prow"><a href="edit-profile.html" aria-label="Edit profile">${avatar({name:me.name,photo:me.photo},'pl')}</a><div><h2>${esc(me.name)}</h2><p>${esc(user.email||'')}</p></div></div></section><nav class="pmenu card">${items.map(([i,l,u])=>`<a href="${u}">${ic(i,20)}<span>${l}</span>${ic('chev',16)}</a>`).join('')}<button id="lo">${ic('out',20)}<span>Log Out</span>${ic('chev',16)}</button></nav>`;
- $('#lo').onclick=async()=>{await A.signOut(auth);location.href='login.html'}};
+ const [dn,dns,rq]=await Promise.all([F.getDoc(F.doc(db,'donors',user.uid)).then(s=>s.exists()?s.data():null).catch(()=>null),list(mine('donations')).catch(()=>[]),list(mine('requests')).catch(()=>[])]);
+ const items=[['edit','Edit Profile','Update your photo and details','edit-profile.html'],['drop','My Donations','Your donation history','history.html'],['list','My Requests','Blood requests you made','my-requests.html'],['gear','Settings','Theme, alerts and location','settings.html'],['help','Help & Support','Answers to common questions','help.html'],...(me.role=='admin'?[['shield','Admin Panel','Manage the whole system',ADMIN_URL]]:[])];
+ const st=(n,l)=>`<div><b>${esc(n)}</b><span>${l}</span></div>`;
+ v.innerHTML=`<div class="pg"><aside class="pside"><section class="phead"><a class="pback" href="home.html" aria-label="Back">${ic('back',24)}</a><div class="prow"><a href="edit-profile.html" aria-label="Edit profile">${avatar({name:me.name,photo:me.photo},'pl')}</a><div class="pinfo"><h2>${esc(me.name)}</h2><p>${esc(user.email||'')}</p><div class="pbadges">${me.group?`<span class="pb">${esc(me.group)}</span>`:''}${me.city?`<span class="pb">${esc(me.city)}</span>`:''}${dn?`<span class="pb">${dn.a===false?'Busy':'Available'}</span>`:''}</div></div></div></section><div class="pstats card">${st(dns.length,'Donations')}${st(rq.length,'Requests')}${st(me.group||'-','Blood group')}</div></aside><nav class="pmenu card">${items.map(([i,l,d,u])=>`<a href="${u}">${ic(i,20)}<span><b>${l}</b><small>${d}</small></span>${ic('chev',16)}</a>`).join('')}<button id="lo">${ic('out',20)}<span><b>Log Out</b><small>Sign out of this device</small></span>${ic('chev',16)}</button></nav></div>`;
+ $('#lo').onclick=async()=>{clearCache();await A.signOut(auth);location.href='login.html'}};
 R['edit-profile']=async v=>{let dn={};try{const s=await F.getDoc(F.doc(db,'donors',user.uid));dn=s.exists()?s.data():{}}catch(e){}
  let photo=me.photo||dn.photo||'',loc=me.lat!=null?{lat:me.lat,lng:me.lng}:dn.lat!=null?{lat:dn.lat,lng:dn.lng}:null;
  v.innerHTML=`<div class="card prof cen"><div id="pv">${avatar({name:me.name,photo},'xl')}</div><p class="mut">Choose a new photo below</p></div><form class="card form" id="f"><h3>Profile and donor details</h3><label>Profile photo<input class="in" type="file" id="ph" accept="image/*"></label>${inp('Full name','n','text',me.name)}${inp('Phone','p','tel',me.phone||'')}${inp('City / area','c','text',me.city||'')}${sel('Blood group','g',GROUPS,me.group||'','Select blood group')}${inp('Last donated','l','date',dn.last||'')}<div class="row sp" style="margin-top:12px"><span class="mut" id="lt">${loc?'Map location saved':'Map location not set'}</span><span class="row" style="gap:6px"><button type="button" class="btn sm o" id="gl">Use GPS</button><button type="button" class="btn sm o" id="pl">Pick on map</button></span></div><label class="row"><input type="checkbox" id="a" ${dn.a===false?'':'checked'}> Available to donate</label><button class="btn">Save changes</button></form>`;
@@ -152,8 +154,19 @@ R.camps=async v=>{const cs=(await list(col('camps'))).sort((a,b)=>(a.date||'').l
  v.onclick=async e=>{const b=e.target.closest('button[data-i]');if(!b)return;try{await F.updateDoc(F.doc(db,'camps',b.dataset.i),{joined:b.dataset.j=='1'?F.arrayRemove(user.uid):F.arrayUnion(user.uid)});location.reload()}catch(x){fail(x)}}};
 R.features=v=>{v.innerHTML=`<div class="card"><ul class="ft">${['Donor Search and Filters','Blood Request System','Open Requests Feed','Donation History','Push-style Notifications','QR Donor Card','Donation Camps','Admin Dashboard','Real-time Cloud Data (Firebase)','Clean and Modern UI'].map(x=>`<li>${ic('star',14)} ${x}</li>`).join('')}</ul><p class="cen" style="font-size:22px;font-style:italic;color:var(--red);margin-top:14px;font-weight:600">Because Life Matters</p></div>`};
 /* ---------- run ---------- */
-if(['splash','onboarding','login','signup'].includes(page))R[page]();
-else{shell();const v=$('#view');v.innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk s"></div>';try{await R[page](v)}catch(e){console.error(e);v.innerHTML=empty(ic('alert',48),'Could not load data','Check your connection and Firestore rules, then try again.')}}
+const SK='<div class="sk"></div><div class="sk"></div><div class="sk s"></div>';
+const cached=APPPAGE?readCache():null;let v;
+if(cached){me=cached;shell();v=$('#view');v.innerHTML=SK}
+user=await authReady;
+if(!user&&APPPAGE){clearCache();location.replace('login.html');await halt()}
+if(user&&['login','signup'].includes(page)){location.replace('home.html');await halt()}
+if(user){try{const s=await F.getDoc(F.doc(db,'users',user.uid));me=s.exists()?s.data():{}}catch(e){}me.name=me.name||user.displayName||(user.email||'Donor').split('@')[0]}
+if(APPPAGE){try{sessionStorage.setItem(CK,JSON.stringify(me))}catch(e){}
+ if(!cached||cached.name!=me.name||cached.role!=me.role||cached.photo!=me.photo){shell();v=$('#view');v.innerHTML=SK}
+ badge();try{await R[page](v)}catch(e){console.error(e);v.innerHTML=empty(ic('alert',48),'Could not load data','Check your connection and Firestore rules, then try again.')}}
+else R[page]();
 
 if('serviceWorker' in navigator&&(location.protocol=='https:'||location.hostname=='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 document.addEventListener('pointerover',e=>{const a=e.target.closest&&e.target.closest('a[href$=".html"]');if(a&&!a.dataset.pf){a.dataset.pf=1;const l=document.createElement('link');l.rel='prefetch';l.href=a.href;document.head.appendChild(l)}},{passive:true});
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href]');if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||e.shiftKey||e.button||a.target||a.hasAttribute('download'))return;const u=new URL(a.href,location.href),v=$('#view');if(!v||u.origin!=location.origin||!u.pathname.endsWith('.html')||(u.pathname==location.pathname&&u.search==location.search))return;e.preventDefault();v.classList.add('out');setTimeout(()=>{location.href=a.href},110)});
+addEventListener('pageshow',()=>{const v=$('#view');if(v)v.classList.remove('out')});
